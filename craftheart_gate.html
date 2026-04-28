@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C3 — GATEWAY 9 — LAYER ECHO</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap');
+
+  :root {
+    --bg: #050505;
+    --bg2: #0a0a0a;
+    --yellow: #e8c84a;
+    --yellow-dim: #a08920;
+    --white: #d8d4cc;
+    --dim: #444440;
+    --dimmer: #222220;
+    --red: #8a2020;
+    --green: #2a6a3a;
+    --green-bright: #4aaa6a;
+    --scan-line: rgba(232, 200, 74, 0.015);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; min-height: 100vh;
+    background: var(--bg);
+    color: var(--white);
+    font-family: 'Share Tech Mono', 'Courier New', monospace;
+    overflow-x: hidden;
+    cursor: default;
+  }
+
+  /* ── SCAN LINES ─────────────────────────────────────────── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 999; pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      var(--scan-line) 2px,
+      var(--scan-line) 4px
+    );
+    animation: scanMove 8s linear infinite;
+  }
+  @keyframes scanMove {
+    0%   { background-position: 0 0; }
+    100% { background-position: 0 100px; }
+  }
+
+  /* ── VIGNETTE ─────────────────────────────────────────── */
+  body::after {
+    content: '';
+    position: fixed; inset: 0; z-index: 998; pointer-events: none;
+    background: radial-gradient(ellipse at center,
+      transparent 40%,
+      rgba(0,0,0,0.7) 100%
+    );
+  }
+
+  /* ── NOISE OVERLAY ─────────────────────────────────────── */
+  #noise {
+    position: fixed; inset: 0; z-index: 997; pointer-events: none;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 200px 200px;
+    animation: noiseShift 0.15s steps(1) infinite;
+  }
+  @keyframes noiseShift {
+    0%  { background-position: 0 0; }
+    25% { background-position: 50px 20px; }
+    50% { background-position: -30px 60px; }
+    75% { background-position: 80px -40px; }
+  }
+
+  /* ── MAIN LAYOUT ───────────────────────────────────────── */
+  #wrap {
+    position: relative; z-index: 10;
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 40px 20px;
+  }
+
+  /* ── HEADER ─────────────────────────────────────────────── */
+  #header {
+    text-align: center;
+    margin-bottom: 48px;
+    opacity: 0;
+    animation: fadeUp 1.2s ease forwards;
+    animation-delay: 0.3s;
+  }
+  .header-label {
+    font-size: 10px;
+    letter-spacing: 0.4em;
+    color: var(--dim);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+  .header-title {
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    color: var(--yellow-dim);
+    margin-bottom: 32px;
+  }
+
+  /* ── BORDER FRAME ───────────────────────────────────────── */
+  .frame {
+    width: 100%;
+    max-width: 560px;
+    border: 1px solid var(--dimmer);
+    position: relative;
+    padding: 40px 36px;
+    background: rgba(10,10,10,0.9);
+    opacity: 0;
+    animation: fadeUp 1s ease forwards;
+    animation-delay: 0.7s;
+  }
+  .frame::before,
+  .frame::after {
+    content: '';
+    position: absolute;
+    width: 12px; height: 12px;
+    border-color: var(--yellow-dim);
+    border-style: solid;
+  }
+  .frame::before {
+    top: -1px; left: -1px;
+    border-width: 1px 0 0 1px;
+  }
+  .frame::after {
+    bottom: -1px; right: -1px;
+    border-width: 0 1px 1px 0;
+  }
+  .frame-corner-tr, .frame-corner-bl {
+    position: absolute;
+    width: 12px; height: 12px;
+    border-color: var(--yellow-dim);
+    border-style: solid;
+  }
+  .frame-corner-tr { top: -1px; right: -1px; border-width: 1px 1px 0 0; }
+  .frame-corner-bl { bottom: -1px; left: -1px; border-width: 0 0 1px 1px; }
+
+  /* ── QUESTION TEXT ──────────────────────────────────────── */
+  .question-label {
+    font-size: 9px;
+    letter-spacing: 0.35em;
+    color: var(--dim);
+    margin-bottom: 20px;
+    text-transform: uppercase;
+  }
+  .question {
+    font-family: 'Courier Prime', 'Courier New', monospace;
+    font-size: 20px;
+    line-height: 1.4;
+    color: var(--white);
+    margin-bottom: 36px;
+    letter-spacing: 0.02em;
+  }
+
+  /* ── DIVIDER ─────────────────────────────────────────────── */
+  .divider {
+    width: 100%;
+    height: 1px;
+    background: var(--dimmer);
+    margin: 0 0 32px;
+    position: relative;
+  }
+  .divider::before {
+    content: '──── ◆ ────';
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--bg2);
+    padding: 0 8px;
+    font-size: 9px;
+    color: var(--dimmer);
+    letter-spacing: 0.2em;
+  }
+
+  /* ── INPUT AREA ─────────────────────────────────────────── */
+  .input-wrap {
+    position: relative;
+    margin-bottom: 16px;
+  }
+  .input-prefix {
+    position: absolute;
+    left: 0; top: 50%;
+    transform: translateY(-50%);
+    font-size: 13px;
+    color: var(--yellow-dim);
+    user-select: none;
+    pointer-events: none;
+  }
+  #answer {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--dim);
+    outline: none;
+    padding: 8px 0 8px 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    color: var(--white);
+    letter-spacing: 0.08em;
+    caret-color: var(--yellow);
+    transition: border-color 0.3s;
+  }
+  #answer:focus { border-bottom-color: var(--yellow-dim); }
+  #answer::placeholder { color: var(--dimmer); }
+  #answer.wrong { border-bottom-color: var(--red); animation: shake 0.4s ease; }
+  #answer.correct-input { border-bottom-color: var(--green-bright); }
+
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20%      { transform: translateX(-6px); }
+    40%      { transform: translateX(6px); }
+    60%      { transform: translateX(-4px); }
+    80%      { transform: translateX(4px); }
+  }
+
+  /* ── SUBMIT BUTTON ──────────────────────────────────────── */
+  #submit-btn {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--dimmer);
+    color: var(--dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.4em;
+    padding: 12px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.3s;
+    margin-bottom: 20px;
+  }
+  #submit-btn:hover {
+    border-color: var(--yellow-dim);
+    color: var(--yellow);
+    background: rgba(232,200,74,0.04);
+  }
+  #submit-btn:active { transform: scale(0.99); }
+
+  /* ── ATTEMPTS COUNTER ───────────────────────────────────── */
+  #attempts-display {
+    font-size: 9px;
+    color: var(--dimmer);
+    letter-spacing: 0.3em;
+    text-align: center;
+    min-height: 14px;
+  }
+
+  /* ── ERROR MESSAGE ──────────────────────────────────────── */
+  #error-msg {
+    font-size: 10px;
+    color: var(--red);
+    letter-spacing: 0.2em;
+    margin-top: 12px;
+    min-height: 16px;
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  #error-msg.visible { opacity: 1; }
+
+  /* ── HINT ───────────────────────────────────────────────── */
+  #hint {
+    margin-top: 20px;
+    font-size: 9px;
+    color: var(--dimmer);
+    letter-spacing: 0.2em;
+    text-align: center;
+    min-height: 14px;
+    font-style: italic;
+    opacity: 0;
+    transition: opacity 0.8s;
+  }
+  #hint.visible { opacity: 1; }
+
+  /* ── BOTTOM LABEL ───────────────────────────────────────── */
+  #bottom-label {
+    margin-top: 32px;
+    font-size: 9px;
+    color: var(--dimmer);
+    letter-spacing: 0.25em;
+    text-align: center;
+    opacity: 0;
+    animation: fadeUp 1s ease forwards;
+    animation-delay: 1.2s;
+  }
+
+  /* ── CURSOR BLINK ───────────────────────────────────────── */
+  .blink {
+    animation: blink 1.1s step-end infinite;
+    color: var(--yellow);
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     SUCCESS SCREEN
+  ══════════════════════════════════════════════════════════ */
+  #success-screen {
+    position: fixed; inset: 0; z-index: 500;
+    background: var(--bg);
+    display: none;
+    align-items: center; justify-content: center;
+    flex-direction: column;
+    padding: 40px 20px;
+  }
+  #success-screen.active { display: flex; }
+
+  .success-inner {
+    max-width: 600px;
+    width: 100%;
+    text-align: center;
+  }
+
+  .success-tag {
+    font-size: 9px;
+    letter-spacing: 0.5em;
+    color: var(--green-bright);
+    margin-bottom: 20px;
+    opacity: 0;
+  }
+
+  .success-line {
+    font-family: 'Courier Prime', 'Courier New', monospace;
+    font-size: clamp(14px, 3vw, 18px);
+    line-height: 1.9;
+    color: var(--white);
+    margin-bottom: 0;
+    opacity: 0;
+  }
+  .success-line.dim { color: var(--dim); }
+  .success-line.yellow { color: var(--yellow); }
+  .success-line.small {
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    color: var(--dim);
+  }
+
+  .success-divider {
+    width: 1px;
+    height: 40px;
+    background: var(--dimmer);
+    margin: 28px auto;
+    opacity: 0;
+  }
+
+  .coord-block {
+    margin-top: 32px;
+    border: 1px solid var(--dimmer);
+    padding: 20px 28px;
+    display: inline-block;
+    text-align: left;
+    opacity: 0;
+    position: relative;
+  }
+  .coord-block::before, .coord-block::after {
+    content: '';
+    position: absolute;
+    width: 8px; height: 8px;
+    border-color: var(--yellow-dim);
+    border-style: solid;
+  }
+  .coord-block::before { top: -1px; left: -1px; border-width: 1px 0 0 1px; }
+  .coord-block::after  { bottom: -1px; right: -1px; border-width: 0 1px 1px 0; }
+
+  .coord-label {
+    font-size: 8px;
+    letter-spacing: 0.4em;
+    color: var(--yellow-dim);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+  }
+  .coord-value {
+    font-size: 16px;
+    color: var(--yellow);
+    letter-spacing: 0.08em;
+  }
+  .coord-note {
+    font-size: 8px;
+    color: var(--dimmer);
+    letter-spacing: 0.25em;
+    margin-top: 8px;
+  }
+
+  .warning-block {
+    margin-top: 24px;
+    font-size: 9px;
+    letter-spacing: 0.25em;
+    color: var(--red);
+    opacity: 0;
+    text-transform: uppercase;
+  }
+
+  /* ── TYPEWRITER ─────────────────────────────────────────── */
+  .typewriter { overflow: hidden; white-space: nowrap; }
+
+  /* ── GLITCH EFFECT ──────────────────────────────────────── */
+  @keyframes glitch {
+    0%,100% { clip-path: inset(0 0 98% 0); transform: translate(-2px); }
+    20%     { clip-path: inset(30% 0 50% 0); transform: translate(2px); }
+    40%     { clip-path: inset(70% 0 10% 0); transform: translate(-1px); }
+    60%     { clip-path: inset(10% 0 80% 0); transform: translate(3px); }
+    80%     { clip-path: inset(50% 0 30% 0); transform: translate(-2px); }
+  }
+
+  /* ── CORRECT FLASH ──────────────────────────────────────── */
+  #flash {
+    position: fixed; inset: 0; z-index: 400;
+    background: white;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.08s;
+  }
+  #flash.on { opacity: 0.06; }
+
+  /* ── STATIC GLITCH LINE ─────────────────────────────────── */
+  #glitch-line {
+    position: fixed;
+    left: 0; right: 0;
+    height: 2px;
+    background: var(--yellow);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 600;
+    transition: opacity 0.05s;
+  }
+</style>
+</head>
+<body>
+
+<div id="noise"></div>
+<div id="flash"></div>
+<div id="glitch-line"></div>
+
+<!-- ── GATE SCREEN ─────────────────────────────────────────── -->
+<div id="wrap">
+  <div id="header">
+    <div class="header-label">C3 — GATEWAY 9 — LAYER ECHO</div>
+    <div class="header-title">sundist-dist.io / c3_9le_gate</div>
+  </div>
+
+  <div class="frame">
+    <div class="frame-corner-tr"></div>
+    <div class="frame-corner-bl"></div>
+
+    <div class="question-label">QUERY ▸ LAYER 3 ▸ GATE CIPHER</div>
+    <div class="question">WHAT DID SHE BUILD FIRST?</div>
+
+    <div class="divider"></div>
+
+    <div class="input-wrap">
+      <span class="input-prefix">▸</span>
+      <input
+        type="text"
+        id="answer"
+        placeholder="enter response..."
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false"
+        maxlength="80"
+      />
+    </div>
+
+    <div id="error-msg"></div>
+
+    <div id="hint"></div>
+
+    <br>
+
+    <button id="submit-btn" onclick="checkAnswer()">
+      SUBMIT RESPONSE
+    </button>
+
+    <div id="attempts-display">ATTEMPTS: 0</div>
+  </div>
+
+  <div id="bottom-label">
+    SHE DESERVES TO BE FOUND. <span class="blink">_</span>
+  </div>
+</div>
+
+<!-- ── SUCCESS SCREEN ──────────────────────────────────────── -->
+<div id="success-screen">
+  <div class="success-inner" id="success-content">
+    <!-- populated by JS -->
+  </div>
+</div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────────────
+const CORRECT_ANSWERS = [
+  "something with no door",
+  "a home with no door",
+  "home with no door",
+  "something without a door",
+  "a house with no door",
+  "house with no door",
+  "a home without a door",
+  "home without a door",
+  "no door",
+  "without a door",
+  "with no door",
+];
+
+const WRONG_MESSAGES = [
+  "INCORRECT.",
+  "INCORRECT.",
+  "INCORRECT. THINK DIFFERENTLY.",
+  "INCORRECT. THE ANSWER IS NOT LITERAL.",
+  "INCORRECT. WHAT QUALITY DID IT HAVE?",
+  "INCORRECT. WHY DID SHE BUILD IT THAT WAY?",
+  "INCORRECT. SHE KNEW HE WOULD NEVER LEAVE.",
+];
+
+const HINT_MESSAGES = [
+  "",
+  "",
+  "think about the quality of what she built — not what it was.",
+  "she built safety. she built certainty. she left something out on purpose.",
+  "rule 5 told you something. 'wait. he will speak first.' she knew he would stay.",
+  "the answer is not a structure. the answer is a decision.",
+  "why would you build a home without a door?",
+];
+
+let attempts = 0;
+let solved = false;
+
+// ── GLITCH EFFECT ─────────────────────────────────────────────────────────
+function doGlitch() {
+  const fl = document.getElementById('flash');
+  const gl = document.getElementById('glitch-line');
+  gl.style.top = (Math.random() * 100) + 'vh';
+  gl.style.opacity = '1';
+  fl.classList.add('on');
+  setTimeout(() => { gl.style.opacity = '0'; fl.classList.remove('on'); }, 80);
+}
+
+// ── TYPING SOUND SIMULATION (visual only) ────────────────────────────────
+document.getElementById('answer').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !solved) checkAnswer();
+});
+
+// ── CHECK ANSWER ──────────────────────────────────────────────────────────
+function checkAnswer() {
+  if (solved) return;
+
+  const raw = document.getElementById('answer').value.trim().toLowerCase();
+  if (!raw) return;
+
+  const isCorrect = CORRECT_ANSWERS.some(a => raw.includes(a) || a.includes(raw) && raw.length > 5);
+
+  attempts++;
+  document.getElementById('attempts-display').textContent = `ATTEMPTS: ${attempts}`;
+
+  if (isCorrect) {
+    solved = true;
+    showCorrect();
+  } else {
+    showWrong();
+  }
+}
+
+function showWrong() {
+  const input = document.getElementById('answer');
+  const errEl = document.getElementById('error-msg');
+  const hintEl = document.getElementById('hint');
+
+  // shake
+  input.classList.remove('wrong');
+  void input.offsetWidth;
+  input.classList.add('wrong');
+  setTimeout(() => input.classList.remove('wrong'), 500);
+
+  // glitch flash
+  doGlitch();
+
+  // error message
+  const idx = Math.min(attempts - 1, WRONG_MESSAGES.length - 1);
+  errEl.textContent = WRONG_MESSAGES[idx];
+  errEl.classList.add('visible');
+
+  // hint after 2 attempts
+  if (attempts >= 2) {
+    const hIdx = Math.min(attempts - 1, HINT_MESSAGES.length - 1);
+    if (HINT_MESSAGES[hIdx]) {
+      hintEl.textContent = '↳ ' + HINT_MESSAGES[hIdx];
+      hintEl.classList.add('visible');
+    }
+  }
+
+  // clear input
+  setTimeout(() => { document.getElementById('answer').value = ''; }, 300);
+}
+
+// ── SUCCESS SEQUENCE ──────────────────────────────────────────────────────
+function showCorrect() {
+  const input = document.getElementById('answer');
+  input.classList.add('correct-input');
+
+  // three glitch flashes
+  doGlitch();
+  setTimeout(doGlitch, 120);
+  setTimeout(doGlitch, 280);
+
+  const successLines = [
+    { text: 'CORRECT.', class: 'success-tag', delay: 400 },
+    { text: 'SHE BUILT A HOME WITHOUT A DOOR', class: 'success-line yellow', delay: 900 },
+    { text: 'BECAUSE SHE KNEW HE\'D NEVER LEAVE.', class: 'success-line', delay: 1600 },
+    { text: '——————', class: 'success-line dim', delay: 2500 },
+    { text: 'THE FIRST STRUCTURE ON CRAFTHEART SMP', class: 'success-line small', delay: 3200 },
+    { text: 'WAS BUILT ON MARCH 9TH, 2019', class: 'success-line small', delay: 3700 },
+    { text: 'AT 4:22 PM LOCAL TIME', class: 'success-line small', delay: 4100 },
+    { text: 'BY A PLAYER NAMED LILY.', class: 'success-line small', delay: 4600 },
+    { text: '——————', class: 'success-line dim', delay: 5400 },
+    { text: 'IT HAS NEVER BEEN CHANGED.', class: 'success-line dim', delay: 6000 },
+    { text: 'IT WILL NEVER BE CHANGED.', class: 'success-line dim', delay: 6500 },
+  ];
+
+  const coordDelay = 7400;
+  const warnDelay = 8600;
+
+  setTimeout(() => {
+    const screen = document.getElementById('success-screen');
+    const content = document.getElementById('success-content');
+    content.innerHTML = '';
+    screen.classList.add('active');
+
+    successLines.forEach(({ text, class: cls, delay }) => {
+      const el = document.createElement('div');
+      el.className = cls;
+      el.textContent = text;
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(8px)';
+      el.style.transition = 'opacity 0.7s ease, transform 0.7s ease';
+      content.appendChild(el);
+
+      setTimeout(() => {
+        el.style.opacity = '1';
+        el.style.transform = 'translateY(0)';
+        if (text === 'CORRECT.') doGlitch();
+      }, delay);
+    });
+
+    // coordinate block
+    setTimeout(() => {
+      const coord = document.createElement('div');
+      coord.className = 'coord-block';
+      coord.innerHTML = `
+        <div class="coord-label">BELOW IS A COORDINATE — DO NOT GO THERE</div>
+        <div class="coord-label" style="margin-top:2px;color:var(--dim)">THIS IS NOT A GAME. THIS IS A GRAVE.</div>
+        <div style="height:12px"></div>
+        <div class="coord-value">44.5283° N, 89.5817° W</div>
+        <div class="coord-note">PORTAGE COUNTY, WISCONSIN — HEARTWOOD, D. R.</div>
+      `;
+      coord.style.opacity = '0';
+      coord.style.transition = 'opacity 1s ease';
+      content.appendChild(coord);
+      setTimeout(() => coord.style.opacity = '1', 100);
+    }, coordDelay);
+
+    // warning
+    setTimeout(() => {
+      const warn = document.createElement('div');
+      warn.className = 'warning-block';
+      warn.style.opacity = '0';
+      warn.style.transition = 'opacity 1.2s ease';
+      warn.innerHTML = '⚠ DO NOT GO THERE &nbsp;·&nbsp; THIS IS NOT A GAME';
+      content.appendChild(warn);
+      setTimeout(() => warn.style.opacity = '1', 100);
+
+      // final line
+      setTimeout(() => {
+        const final = document.createElement('div');
+        final.style.marginTop = '40px';
+        final.style.fontSize = '9px';
+        final.style.letterSpacing = '0.3em';
+        final.style.color = 'var(--dim)';
+        final.style.opacity = '0';
+        final.style.transition = 'opacity 1.5s ease';
+        final.textContent = 'SHE IS HOME.';
+        content.appendChild(final);
+        setTimeout(() => final.style.opacity = '1', 200);
+      }, 1200);
+    }, warnDelay);
+
+  }, 600);
+}
+
+// ── AMBIENT GLITCH (random) ───────────────────────────────────────────────
+function randomGlitch() {
+  if (!solved && Math.random() < 0.15) doGlitch();
+  setTimeout(randomGlitch, 4000 + Math.random() * 8000);
+}
+setTimeout(randomGlitch, 5000);
+
+// ── CURSOR EFFECT ─────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('answer').focus();
+});
+</script>
+</body>
+</html>
